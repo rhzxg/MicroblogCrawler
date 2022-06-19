@@ -22,5 +22,6 @@ pip install requirements.txt
 运行WeiboCrawler.py
 
 效果:
+
 https://user-images.githubusercontent.com/49633098/174478381-d91b3f7c-920b-4587-bea2-d67a40ece5b6.mp4
 
