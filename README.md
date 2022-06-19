@@ -1,8 +1,6 @@
 # WeiboCrawler
 微博热榜爬虫
 
----
-
 **Step1:**
 
 ```powershell
@@ -22,3 +20,7 @@ pip install requirements.txt
 **Step4:**
 
 运行WeiboCrawler.py
+
+效果:
+https://user-images.githubusercontent.com/49633098/174478381-d91b3f7c-920b-4587-bea2-d67a40ece5b6.mp4
+
