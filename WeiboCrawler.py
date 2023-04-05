@@ -10,12 +10,16 @@ import os
 
 class CreeperExplode:
     def __init__(self) -> None:
-        self.driverChoice = "msedgedriver.exe"
+        self.driverChoice = "driver/msedgedriver.exe"
 
-        self.currentFolderLocation = "files/"
+        self.currentDirName = "faultDir"
+        self.currentFolderLocation = "crawled/"
         self.CheckFolderExistence()
 
         self.noPicMode = True
+
+        # 1. 单页模式 2. 多页模式
+        self.crawMode = 1
 
         self.targetUrlList = list()
 
@@ -40,10 +44,24 @@ class CreeperExplode:
         #     if currUrlInput == "": break
         #     self.targetUrlList.append(currUrlInput)
         currUrlInput = input("请输入微博网址: ")
-        if len(currUrlInput) != 0 and currUrlInput.find("&xsort=hot") == -1:
-            currUrlInput = "https://s.weibo.com/hot?q=" + currUrlInput[28:] + "&xsort=hot&suball=1&tw=hotweibo&Refer=hot_hot"
 
+        if currUrlInput.find("%23") == -1 and not currUrlInput.endswith("#comment"):
+            currUrlInput += "#comment"
+
+        self.CheckCrawlMode(currUrlInput)
+
+        if self.crawMode == 2 and currUrlInput.find("&xsort=hot") == -1:
+            currUrlInput = "https://s.weibo.com/hot?q=" + currUrlInput[28:] + "&xsort=hot&suball=1&tw=hotweibo&Refer=hot_hot"
+        
         self.targetUrlList.append(currUrlInput)
+
+    def CheckCrawlMode(self, url: str):
+        if url.endswith("#comment"):
+            self.crawMode = 1
+        else:
+            self.crawMode = 2
+
+        print("\033[0;35;40m" + ("Craw Mode: " + "Single-Page Mode" if self.crawMode == 1 else "Multi-Page Mode") + "\033[0m")
 
     @staticmethod
     def SleepFor(sec) -> None:
@@ -54,7 +72,7 @@ class CreeperExplode:
         time.sleep(sec)
 
     @staticmethod
-    def EmojyStripper(reply: str) -> str:
+    def SerializeEmojy(reply: str) -> str:
         """
         Special cases:
         replace 笑cry with 笑哭
@@ -130,36 +148,51 @@ class CreeperExplode:
         self.WaitUntilLoaded()
 
         for url in self.targetUrlList:
-            self.DirCreator(url)
+            self.CreateDir(url)
             self.browser.get(url)
             print("Navigating into detail pages...")
-            self.UrlSaver(url)
+            self.SaveUrl(url)
             try:
-                self.StartExplosion()
+                if self.crawMode == 1:
+                    self.StartCrawlSingleItem()
+                elif self.crawMode == 2:
+                    self.StartCrawlMultiItems()
             except:
                 continue
 
-        print("Program finished.")
+        print("\033[0;31;40m" + "Program finished. " + "Hit any key to exit." + "\033[0m")
+        input()
+        self.browser.close()
 
-    def DirCreator(self, url) -> None:
-        dirName = "faultDir"
-        try:
-            dirName = urllib.parse.unquote(url[26:-47])
-        except:
-            pass
-        try:
-            os.mkdir("files/" + dirName)
+    def CreateDir(self, url) -> None:
+        if self.crawMode == 1:
+            try:
+                self.currentDirName = url[url.rfind("/") + 1 : url.rfind("#")]
+            except:
+                pass
 
+        elif self.crawMode == 2:
+            try:
+                self.currentDirName = urllib.parse.unquote(url[26:-47])
+            except:
+                pass
+        
+        try:
+            os.mkdir("crawled/" + self.currentDirName)
         except:
             pass
         finally:
-            self.currentFolderLocation = "files/" + dirName + "/"
+            self.currentFolderLocation = "crawled/" + self.currentDirName + "/"
 
-    def UrlSaver(self, url) -> None:
+    def SaveUrl(self, url) -> None:
         with open(self.currentFolderLocation + "/网址.txt", "w", encoding="utf-8") as urlFileObject:
             urlFileObject.write(url)
 
-    def StartExplosion(self) -> None:
+    def StartCrawlSingleItem(self) -> None:
+        self.browser.get(self.targetUrlList[0])
+        self.DumpOnDetailedPage(self.currentDirName)
+
+    def StartCrawlMultiItems(self) -> None:
         """
         Start looping: navigate to detail page,
         and get every detail of comments
@@ -197,11 +230,11 @@ class CreeperExplode:
                     print("Redirecting to detail page...")
                     self.browser.get(b[0].get_attribute("href"))
 
-                    # Comment dumping code here:
-                    self.DumpEveryComment("page" + str(page) + "-item" + str(i))
+                    print("Dumping on detailed page...")
+                    self.DumpOnDetailedPage("page" + str(page) + "-item" + str(i))
                 else:
                     print("Dumping on current page...")
-                    self.DumpCurrentComments(i - 1, "page" + str(page) + "-item" + str(i))
+                    self.DumpOnCurrentPage(i - 1, "page" + str(page) + "-item" + str(i))
 
             # Next page
             next_page = self.browser.find_elements(By.CLASS_NAME, "m-page")[0].find_elements(
@@ -211,7 +244,7 @@ class CreeperExplode:
             current_page += 1
             self.SleepFor(2)
 
-    def DumpCurrentComments(self, i: int, file_name: str) -> None:
+    def DumpOnCurrentPage(self, i: int, file_name: str) -> None:
         """
         Dump function for fewer comments drawn on
         current page only.
@@ -226,7 +259,7 @@ class CreeperExplode:
 
         wbc = self.browser.find_elements(By.CLASS_NAME, "txt")[i].get_attribute("innerText").replace("\n", "").replace(
             " ", "")
-        wbc = self.EmojyStripper(wbc)
+        wbc = self.SerializeEmojy(wbc)
         CurrentFileObj.write("wbc " + wbc + "\n\n")
 
         try:
@@ -253,7 +286,7 @@ class CreeperExplode:
                     By.TAG_NAME, "a")[0].get_attribute("innerText")
                 content_raw = base_node.find_elements(By.CLASS_NAME, "txt")[0].get_attribute("innerHTML")[1:].strip()
                 content_raw = re.sub('<a.*</a>', "", content_raw)
-                content = self.EmojyStripper(content_raw).replace("\n", "").replace(" ", "")[1:]
+                content = self.SerializeEmojy(content_raw).replace("\n", "").replace(" ", "")[1:]
                 time = base_node.find_elements(By.CLASS_NAME, "fun")[0].find_elements(
                     By.CLASS_NAME, "from")[0].get_attribute("innerText")
                 likes_raw = base_node.find_elements(By.CLASS_NAME, "fun")[0].find_elements(
@@ -266,7 +299,7 @@ class CreeperExplode:
             # Close file object
             CurrentFileObj.close()
 
-    def DumpEveryComment(self, file_name: str) -> None:
+    def DumpOnDetailedPage(self, file_name: str) -> None:
         """
         Start dumping every detailed comment
         :param file_name: current page : current comment
@@ -279,7 +312,7 @@ class CreeperExplode:
 
         wbc = self.browser.find_elements(By.CLASS_NAME, "detail_wbtext_4CRf9")[0].get_attribute(
             "innerText").replace("\n", "").replace(" ", "")
-        wbc = self.EmojyStripper(wbc)
+        wbc = self.SerializeEmojy(wbc)
         CurrentFileObj.write("wbc " + wbc + "\n\n")
 
         wbid_ = self.browser.find_elements(By.CLASS_NAME, "ALink_default_2ibt1")[0].get_attribute(
@@ -468,7 +501,7 @@ class CreeperExplode:
                             "innerText")
                         main_comment_content = base_wrapper.find_elements(By.TAG_NAME, "span")[-1].get_attribute(
                             "innerHTML")
-                        main_comment_content = self.EmojyStripper(main_comment_content)
+                        main_comment_content = self.SerializeEmojy(main_comment_content)
                         likes_exis = base_node.find_elements(By.CLASS_NAME, "item1in")[0].find_elements(
                             By.CLASS_NAME, "info")[0].find_elements(By.CLASS_NAME, "woo-like-count")
                         main_comment_likes = likes_exis[0].get_attribute("innerText") if len(likes_exis) else "0"
@@ -505,7 +538,7 @@ class CreeperExplode:
                             # For now, the dumping work should be started:
                             reply = raw_in.find_elements(By.CLASS_NAME, "text")[0].find_elements(
                                 By.TAG_NAME, "span")[-1].get_attribute("innerHTML")
-                            reply = self.EmojyStripper(reply)
+                            reply = self.SerializeEmojy(reply)
                             name_in = raw_in.find_elements(By.TAG_NAME, "a")[0].get_attribute("innerText")
                             likes_exis_in = raw_in.find_elements(By.CLASS_NAME, "info")[0].find_elements(
                                 By.CLASS_NAME, "woo-like-count")
@@ -532,7 +565,7 @@ class CreeperExplode:
                         slept = True
                     main_comment_content = raw.find_elements(By.CLASS_NAME, "text")[0].find_elements(
                         By.TAG_NAME, "span")[-1].get_attribute("innerHTML")
-                    main_comment_content = self.EmojyStripper(main_comment_content)
+                    main_comment_content = self.SerializeEmojy(main_comment_content)
                     main_comment_name = raw.find_elements(By.TAG_NAME, "a")[1].get_attribute("innerText")
                     likes_exis = raw.find_elements(By.CLASS_NAME, "item1in")[0].find_elements(
                             By.CLASS_NAME, "info")[0].find_elements(By.CLASS_NAME, "woo-like-count")
