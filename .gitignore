@@ -133,3 +133,8 @@ dmypy.json
 
 # web driver
 /driver
+
+# pyinstaller
+/build
+/dist
+*.spec
