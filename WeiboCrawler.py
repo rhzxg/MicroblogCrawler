@@ -1,6 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from msedge.selenium_tools import Edge, EdgeOptions
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
 import webbrowser
 import urllib.parse
 import time
@@ -25,13 +25,15 @@ class CreeperExplode:
 
         self.InputUrls()
 
+        Edge_options = webdriver.EdgeOptions()
         if self.noPicMode:
-            Edge_options = EdgeOptions()
             Edge_options.use_chromium = True
             No_Image_loading = {"profile.managed_default_content_settings.images": 2}
             Edge_options.add_experimental_option("prefs", No_Image_loading)
 
-        self.browser = Edge(self.driverChoice, options=Edge_options)
+        driver = EdgeChromiumDriverManager(path="driver/").install()
+        self.browser = webdriver.Edge(driver, options=Edge_options)
+
         self.StartSession()
 
     def CheckFolderExistence(self) -> None:
