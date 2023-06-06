@@ -13,11 +13,6 @@ pip install requirements.txt
 
 **Step3:**
 
-下载Edge对应版本的Web driver:
-
-[Microsoft Edge WebDriver - Microsoft Edge Developer](https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/)
-
-**Step4:**
 
 运行WeiboCrawler.py
 
