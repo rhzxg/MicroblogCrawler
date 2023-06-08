@@ -7,22 +7,25 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 import PIL.Image
 import urllib.parse
 import urllib.request
-import webbrowser
 import time
 import re
 import os
 import io
 
-# Constants
+# Colors
 class Colors:
-    RED = 31
-    GREEN = 32
-    YELLOW = 33
-    BLUE = 34
-    DEFAULT = 38
+    red = 31
+    green = 32
+    yellow = 33
+    blue = 34
+    default = 38
 
+# Constants
+class Constants:
+    itemsPerPage = 20
+
+# Global variables
 class GlobalVariables:
-    # Global variables
     m_prevLog = ""
 
 class Utility:
@@ -57,14 +60,13 @@ class Utility:
         except:
             pass
 
-    def PrintLog(log: str, color: int = Colors.DEFAULT) -> None:
+    def PrintLog(log: str, color: int = Colors.default) -> None:
+        if GlobalVariables.m_prevLog == log: 
+            return
+        GlobalVariables.m_prevLog = log
+        
         colorPrefix = "\033[" + str(color)
         colorSuffix = "\033[0m"
-
-        if m_prevLog == log: 
-            return
-        m_prevLog = log
-
         print(colorPrefix + log + colorSuffix)
 
     def SleepFor(sec: int) -> None:
@@ -112,46 +114,56 @@ class MicrobolgCrawler:
         self.browser.delete_all_cookies()
         self.browser.get("https://weibo.com/login.php")
 
-        errMsg = "Timeout! Please check your Internet connection and restart the program."
-        self.WaitForEleLoadFinish(By.CLASS_NAME, "S_txt1", errMsg)
+        self.WaitPageLoadFinish()
 
         childFolder = Utility.UnquoteDirectoryFromUrl(self.urlToBeCrawled)
         self.currFolderPath = self.parentFolder + childFolder + "/"
         Utility.CreateFolder(self.currFolderPath)
 
-        #self.SaveAdditionalUrlInfo()
+        self.SaveAdditionalUrlInfo(self.urlToBeCrawled)
 
-        self.LoginIn()
+        self.Login()
 
-    def WaitForEleLoadFinish(self, method: str, key: str, errMsg: str = "") -> None:
+        self.Crawl()
+
+    def WaitPageLoadFinish(self) -> None:
+        try:
+            driverWait = WebDriverWait(self.browser, 60)
+            driverWait.until(lambda: self.browser.execute_script("return document.readyState") == "complete")
+        except TimeoutException:
+            errMsg = "Timeout when waitting the page to be loaded! Please check the network connection and restart the program!"
+            Utility.PrintLog(errMsg, Colors.red)
+
+    def WaitElementLoadFinish(self, method: str, key: str, errMsg: str = "") -> None:
         try:
             driverWait = WebDriverWait(self.browser, 60)
             driverWait.until(EC.presence_of_element_located((method, key)))
         except TimeoutException:
             if len(errMsg) != 0:
-                Utility.PrintLog(errMsg, Colors.RED)
+                Utility.PrintLog(errMsg, Colors.red)
 
     def SaveAdditionalUrlInfo(self, info: str) -> None:
         with open(self.currFolderPath + "/AdditionalInfo.txt", "a", encoding="utf-8") as urlFileObject:
             urlFileObject.write(info + "\n\n")
 
-    def LoginIn(self) -> None:
+    def Login(self) -> None:
             qrCodeImage = None
             while True:
                 if self.browser.find_elements(By.CLASS_NAME, 'S_txt1'):
-                    a = self.browser.find_elements(By.CLASS_NAME, 'S_txt1')
+                    buttons = self.browser.find_elements(By.CLASS_NAME, 'S_txt1')
                     try:
-                        a[9].click()
+                        # click the login button
+                        buttons[9].click()
+                        break
                     except:
                         Utility.SleepFor(2)
                         continue
                 
                 while True:
                     try:
-                        # click the login button
                         self.browser.find_elements(By.CLASS_NAME, "tab_bar")[0].find_elements(By.TAG_NAME, "a")[1].click()
 
-                        #Utility.SleepFor(2)
+                        Utility.SleepFor(2)
                         qrCodeEleXpath = "/html/body/div[4]/div[2]/div[3]/div[2]/div[1]/img"
                         qrCodeEle = self.browser.find_elements(By.XPATH, qrCodeEleXpath)
                         qrCodeUrl = qrCodeEle[0].get_attribute("src")
@@ -160,20 +172,40 @@ class MicrobolgCrawler:
                         qrCodeImage.show()
                         break
                     except:
-                        #Utility.SleepFor(2)
+                        Utility.SleepFor(2)
                         continue
 
-                self.WaitForEleLoadFinish(By.CLASS_NAME, "woo-badge-box")
-                Utility.PrintLog("Page loaded successfully! Waiting for navigation...", Colors.GREEN)
-               
+                self.WaitElementLoadFinish(By.CLASS_NAME, "woo-badge-box")
+                Utility.PrintLog("Login succeeded! Navigating...", Colors.green)
+                qrCodeImage.close()
 
-    def Craw(self) -> None:
+    def Crawl(self) -> None:
         self.browser.get(self.urlToBeCrawled)
-        Utility.PrintLog("Navigating into detail pages...")
+        Utility.PrintLog("Navigating to the page to be crawled...")
 
+        pageCount = self.GetPageCount()
+        for pageNumber in range(1, pageCount + 1):
+            for itemNumber in range(1, Constants.itemsPerPage + 1):
+                Utility.PrintLog("Crawling page {}, item {}.".format(pageNumber, itemNumber), Colors.green)
+
+                self.WaitPageLoadFinish()
+                moreBtnXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[2]/ul/li[2]/a".format(itemNumber)
+                btnLinkXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[3]/div/div[3]/a".format(itemNumber)
+                moreButton = self.browser.find_elements(By.XPATH, moreBtnXPath)
+                if len(moreButton) != 0:
+                    Utility.PrintLog("There is no more page! Cleaning up...", Colors.red)
+                    break
+
+                
+
+        
+    def GetPageCount(self) -> int:
+        pageListXPath =  "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[5]/div/span/ul"
+        pageList = self.browser.find_elements(By.XPATH, pageListXPath)
+        return len(pageList)
 
 if __name__ == "__main__":
     try:
         crawler = MicrobolgCrawler()
     except KeyboardInterrupt:
-        Utility.PrintLog("Program stopped by force!", Colors.RED)
+        Utility.PrintLog("Program stopped by force!", Colors.red)
