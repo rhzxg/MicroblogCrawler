@@ -1,4 +1,4 @@
-# WeiboCrawler
+# MicroblogCrawler
 微博热榜爬虫
 
 **Step1:**
@@ -7,24 +7,25 @@
 pip install requirements.txt
 ```
 
+If you do not have the Python environment or do not even know what that means, just ignore this step and move to step 2.
+
+如果你没有Python环境抑或是根本不知道Python是啥，请移步步骤2
+
 **Step2:**
 
-下载Edge
+Make sure Edge and Excel are installed properly on your computer.
+
+确保你的电脑上已经安装了Edge浏览器和Excel
+
+Make sure the network connection is fine.
+
+确保网络畅通
+
 
 **Step3:**
 
+Run main.py or executable files in ReleasePage if you do not have the Python environment.
 
-运行WeiboCrawler.py
+如果你有Python环境，运行main.py
 
-参数调节:
-
-![image](https://user-images.githubusercontent.com/49633098/174478514-afae753b-b79f-4eb8-b8b3-bad17e467388.png)
-
-First range loop controls the pages to be crawled.
-
-Second range loop controls how many items to be crawled per page (maximum: 20 items).
-
-效果:
-
-https://user-images.githubusercontent.com/49633098/174478381-d91b3f7c-920b-4587-bea2-d67a40ece5b6.mp4
-
+如果你跳过了步骤1，直接运行ReleasePage里的可执行文件
