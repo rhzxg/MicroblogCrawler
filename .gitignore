@@ -8,7 +8,6 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
 develop-eggs/
 dist/
 downloads/
@@ -135,6 +134,6 @@ dmypy.json
 /driver
 
 # pyinstaller
-/build
-/dist
-*.spec
+/build/build
+/build/dist
+/build/*.spec
