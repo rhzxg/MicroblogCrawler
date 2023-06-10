@@ -1,15 +1,16 @@
 from .Utility import *
 import xlwings as Excel
-import sys
+import warnings
 
 # Excel Serializer
 class ExcelSerializer:
     def __init__(self) -> None:
+        warnings.filterwarnings("ignore")
         try:
             self.excelApp = Excel.App(False, False)
         except:
             Utility.PrintLog("Excel is not installed properly on this computer! Program exiting...", Colors.red)
-            sys.exit(-1)
+            Utility.ExitProgram()
 
         self.excelApp.display_alerts = False    
         self.excelApp.screen_updating = False
@@ -20,7 +21,8 @@ class ExcelSerializer:
         self.excelSheet.range("A:F").api.NumberFormat ="@"
         self.excelSheet.range("A1:F1").api.Merge()
         self.excelSheet.range(1, 1).row_height = 30
-        self.excelSheet.range("A:E").column_width = 12
+        self.excelSheet.range("A:C").column_width = 12
+        self.excelSheet.range("D:E").column_width = 20
         self.excelSheet.range("F:F").column_width = 120
         self.excelSheet.range(1, 1).api.HorizontalAlignment = -4131
 
@@ -37,7 +39,10 @@ class ExcelSerializer:
         self.currentRow += 1
 
     def Save(self, folderName: str, fileName: str) -> None:
-        self.excelBook.save(folderName + fileName)
+        fullPath = folderName + fileName
+        if not fullPath.endswith(".xlsx"):
+            fullPath += ".xlsx"
+        self.excelBook.save(fullPath)
 
     def Close(self) -> None:
         self.excelBook.close()

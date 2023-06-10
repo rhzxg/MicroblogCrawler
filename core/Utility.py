@@ -1,5 +1,6 @@
 import urllib
 import time
+import sys
 import re
 import os
 
@@ -21,6 +22,12 @@ class GlobalVariables:
     
 class Utility:
     def TrimUrl(url: str) -> str:
+        if len(re.findall(r"%23.*%23", url)) == 0 or len(re.findall(r"weibo\?q=", url)) == 0:
+            Utility.PrintLog("The url is incorrect! Program exiting...", Colors.red)
+            Utility.ExitProgram()
+
+        url = url.replace("weibo?q=", "hot?q=")
+
         # remove all key-value argument pairs
         pattern = r"&\w+=\w+"
         re.sub(pattern, "", url)
@@ -30,7 +37,7 @@ class Utility:
             "&xsort=hot",
             "&suball=1",
             "&tw=hotweibo",
-            "&Refer=hot_hot"]
+            "&Refer=weibo_hot"]
         for arguement in arguementSuffixs:
             url += arguement
 
@@ -89,3 +96,6 @@ class Utility:
         for index in range(len(images)):
             content = re.subn('<img(.*?)>', "[" + images[index] + "]", content, 1)[0]
         return content
+    
+    def ExitProgram() -> None:
+        sys.exit(-1)

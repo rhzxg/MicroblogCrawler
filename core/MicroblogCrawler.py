@@ -43,7 +43,7 @@ class MicrobolgCrawler:
 
         self.SaveAdditionalUrlInfo(self.urlToBeCrawled)
 
-        self.WaitPageLoadFinish()
+        #self.WaitPageLoadFinish()
 
         self.Login()
 
@@ -61,6 +61,7 @@ class MicrobolgCrawler:
         try:
             driverWait = WebDriverWait(self.browser, 60)
             driverWait.until(EC.presence_of_element_located((method, key)))
+            Utility.SleepFor(0.5)
         except TimeoutException:
             if len(errMsg) != 0:
                 Utility.PrintLog(errMsg, Colors.red)
@@ -72,17 +73,24 @@ class MicrobolgCrawler:
     def Login(self) -> None:
             qrCodeImage = None
             try:
-                qrCodeLoginBtnXPath = "/html/body/div[1]/div[1]/div/div[2]/div[1]/div[2]/div/div[2]/div[1]/div[2]/div[1]/div/div/div/div[1]/div/a[2]"
-                self.browser.find_elements(By.XPATH, qrCodeLoginBtnXPath)[0].click()
-                qrCodeEleXPath = "/html/body/div[1]/div[1]/div/div[2]/div[1]/div[2]/div/div[2]/div[1]/div[2]/div[1]/div/div/div/div[2]/img"
-                qrCodeEle = self.browser.find_elements(By.XPATH, qrCodeEleXPath)
-                qrCodeUrl = qrCodeEle[0].get_attribute("src")
+                loginBtnPath = r"/html/body/div[1]/div[1]/div/div[1]/div/div/div[3]/div[2]/ul/li[3]/a"
+                self.WaitElementLoadFinish(By.XPATH, loginBtnPath)
+                self.browser.find_element(By.XPATH, loginBtnPath).click()
+
+                self.WaitElementLoadFinish(By.CLASS_NAME, "tab_bar")
+                self.browser.find_elements(By.CLASS_NAME, "tab_bar")[0].find_elements(By.TAG_NAME, "a")[1].click()
+                
+                qrCodeEleXpath = "/html/body/div[4]/div[2]/div[3]/div[2]/div[1]/img"
+                self.WaitElementLoadFinish(By.XPATH, qrCodeEleXpath)
+                qrCodeEle = self.browser.find_element(By.XPATH, qrCodeEleXpath)
+                qrCodeUrl = qrCodeEle.get_attribute("src")
                 response = urllib.request.urlopen(qrCodeUrl)
                 qrCodeImage = PIL.Image.open(io.BytesIO(response.read()))
                 qrCodeImage.show()
             except:
                 errMsg = "Error occurred while getting the QR code. Please restart the program!"
                 Utility.PrintLog(errMsg, Colors.red)
+                Utility.ExitProgram()
                 
             self.WaitElementLoadFinish(By.CLASS_NAME, "woo-badge-box")
             Utility.PrintLog("Login succeeded! Redirecting...", Colors.green)
@@ -93,6 +101,7 @@ class MicrobolgCrawler:
         Utility.PrintLog("Redirecting to the page to be crawled...")
 
         pageCount = self.GetPageCount()
+        Utility.PrintLog("Found {} pages.".format(pageCount))
         for pageNumber in range(1, pageCount + 1):
             for itemNumber in range(1, Constants.itemsPerPage + 1):
                 Utility.PrintLog("Crawling page {}, item {}.".format(pageNumber, itemNumber), Colors.green)
@@ -107,16 +116,16 @@ class MicrobolgCrawler:
                     continue
                 else:
                     commentButton[0].click()
-                    self.WaitElementLoadFinish(By.CLASS_NAME, "s-btn-a disable")
 
                 # click the show more button if there is one
                 showMoreBtnXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[3]/div/div[3]/a".format(itemNumber)
-                showMoreButton = self.browser.find_elements(By.XPATH, showMoreBtnXPath)
+                self.WaitElementLoadFinish(By.XPATH, showMoreBtnXPath)
+                showMoreButton = self.browser.find_element(By.XPATH, showMoreBtnXPath)
                 fileName = "page" + str(pageNumber) + "-item" + str(itemNumber)
                 if (len(showMoreBtnXPath) == 0):
                     self.CrawlOnCurrentPage(itemNumber - 1, fileName)
                 else:
-                    url = showMoreButton[0].get_attribute("href")
+                    url = showMoreButton.get_attribute("href")
                     self.CrawlOnDetailedPage(url, fileName)
 
         Utility.PrintLog("Program finished. Hit Enter key to exit.", Colors.blue)
@@ -124,9 +133,12 @@ class MicrobolgCrawler:
         self.browser.close()
 
     def GetPageCount(self) -> int:
-        pageListXPath =  "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[5]/div/span/ul"
-        pageList = self.browser.find_elements(By.XPATH, pageListXPath)
-        return len(pageList)
+        try:
+            Utility.SleepFor(2)
+            pages = self.browser.find_element(By.CLASS_NAME, "s-scroll").find_elements(By.TAG_NAME, "li")
+            return 1 if (len(pages)) == 0 else len(pages)
+        except:
+            return 1
 
     def CrawlOnCurrentPage(self, itemIndex: int, fileName: str) -> None:
         Utility.PrintLog("Crawling on current page...")
@@ -250,7 +262,11 @@ class MicrobolgCrawler:
                             btnClicked = True
 
                     # dump main comment in the frame first
+                    # f stands for inside frame
                     # fc stands for inside frame comment
+                    self.WaitElementLoadFinish(By.CLASS_NAME, "ReplyModal_scroll3_2kADQ")
+                    fBaseNodeEle = self.browser.find_elements(By.CLASS_NAME, "ReplyModal_scroll3_2kADQ")[0].find_elements(
+                        By.CLASS_NAME, "item1")[0]
                     base_wrapper = fBaseNodeEle.find_elements(By.CLASS_NAME, "item1in")[0].find_elements(
                     By.CLASS_NAME, "text")[0]
                     fcContentType = "c"
@@ -264,26 +280,21 @@ class MicrobolgCrawler:
                         "innerText")
                     fcRawContent = base_wrapper.find_elements(By.TAG_NAME, "span")[-1].get_attribute(
                         "innerHTML")
-                    fcContent = self.SerializeEmojy(fcRawContent)
+                    fcContent = Utility.SerializeEmojy(fcRawContent)
                     
                     excelSerializer.WriteLine([fcContentType, fcLikeCount, fcUserID, fcUserName, fcPostTime, fcContent])
 
                     # dump the replies in the frame
-                    # f stands for inside frame
                     fHashSet = set()
                     fComeToEnd = False
                     fFetchedAgain = False
-                    while not (fComeToEnd and fFetchedAgain):
-                        self.WaitElementLoadFinish(By.CLASS_NAME, "ReplyModal_scroll3_2kADQ")
-                        fBaseNodeEle = self.browser.find_elements(By.CLASS_NAME, "ReplyModal_scroll3_2kADQ")[0].find_elements(
-                            By.CLASS_NAME, "item1")[0]
-                        
+                    while not (fComeToEnd and fFetchedAgain):                      
                         if (fComeToEnd):
                             fFetchedAgain = True
 
-                        fRenderedComments = fBaseNodeEle.find_elements(By.CLASS_NAME, "vue-recycle-scroller__item-view")
-                        for fIndex in range(fRenderedComments):
-                            fRawContentElement = fRenderedComments[fIndex]
+                        fRenderedContents = fBaseNodeEle.find_elements(By.CLASS_NAME, "vue-recycle-scroller__item-view")
+                        for fIndex in range(len(fRenderedContents)):
+                            fRawContentElement = fRenderedContents[fIndex]
                             fUserID = fRawContentElement.find_elements(By.TAG_NAME, "a")[0].get_attribute("href")[20:]
                             fPostTime = fRawContentElement.find_elements(By.CLASS_NAME, "info")[0].find_elements(
                                 By.TAG_NAME, "div")[0].get_attribute("innerText")
@@ -326,7 +337,7 @@ class MicrobolgCrawler:
                     userName = rawContentEle.find_elements(By.TAG_NAME, "a")[1].get_attribute("innerText")
                     rawContent = rawContentEle.find_elements(By.CLASS_NAME, "text")[0].find_elements(
                         By.TAG_NAME, "span")[-1].get_attribute("innerHTML")
-                    content = self.SerializeEmojy(rawContent)
+                    content = Utility.SerializeEmojy(rawContent)
 
                     excelSerializer.WriteLine([contentType, likeCount, userID, userName, postTime, content])
 
@@ -338,5 +349,5 @@ class MicrobolgCrawler:
         excelSerializer.Save(self.currFolderPath, fileName)
         excelSerializer.Close()
         
-        print("Current page is finished. Redirecting back...", Colors.default, True)
+        Utility.PrintLog("Current page is finished. Redirecting back...", Colors.default, True)
         self.browser.back()
