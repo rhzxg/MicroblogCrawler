@@ -57,14 +57,16 @@ class MicrobolgCrawler:
             errMsg = "Timeout while waiting for the page to be loaded! Please check the network connection and restart the program!"
             Utility.PrintLog(errMsg, Colors.red)
 
-    def WaitElementLoadFinish(self, method: str, key: str, errMsg: str = "") -> None:
+    def WaitElementLoadFinish(self, method: str, key: str, timeout : float = 60, errMsg: str = "") -> bool:
         try:
-            driverWait = WebDriverWait(self.browser, 60)
+            driverWait = WebDriverWait(self.browser, timeout)
             driverWait.until(EC.presence_of_element_located((method, key)))
             Utility.SleepFor(0.5)
+            return False
         except TimeoutException:
             if len(errMsg) != 0:
                 Utility.PrintLog(errMsg, Colors.red)
+            return True
 
     def SaveAdditionalUrlInfo(self, info: str) -> None:
         with open(self.currFolderPath + "AdditionalInfo.txt", "a", encoding="utf-8") as urlFileObject:
@@ -123,14 +125,12 @@ class MicrobolgCrawler:
 
                 # click the show more button if there is one
                 showMoreBtnXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[3]/div/div[3]/a".format(itemNumber)
-                
-                # !something wrong here! need to fix
-                self.WaitElementLoadFinish(By.XPATH, showMoreBtnXPath)
-                showMoreButton = self.browser.find_element(By.XPATH, showMoreBtnXPath)
+                timeout = self.WaitElementLoadFinish(By.XPATH, showMoreBtnXPath, 5)
                 fileName = "page" + str(pageNumber) + "-item" + str(itemNumber)
-                if (len(showMoreBtnXPath) == 0):
+                if timeout:
                     self.CrawlOnCurrentPage(itemNumber - 1, fileName)
                 else:
+                    showMoreButton = self.browser.find_element(By.XPATH, showMoreBtnXPath)
                     url = showMoreButton.get_attribute("href")
                     self.CrawlOnDetailedPage(url, fileName)
 
