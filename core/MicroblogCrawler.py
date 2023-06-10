@@ -243,7 +243,7 @@ class MicrobolgCrawler:
 
                 hash = userID + postTime
                 if hash in hashSet:
-                    Utility.PrintLog("Main comment already dumped. Skipping...", Colors.default, True)
+                    Utility.PrintLog("Main comment already crawled. Skipping...", Colors.default, True)
                     continue
                 hashSet.add(hash)
 
@@ -307,7 +307,7 @@ class MicrobolgCrawler:
                             
                             fHash = fUserID + fPostTime
                             if fHash in fHashSet:
-                                Utility.PrintLog("Reply already dumped, skipping...", Colors.default, True)
+                                Utility.PrintLog("Reply already crawled, skipping...", Colors.default, True)
                                 continue
                             fHashSet.add(fHash)
 
