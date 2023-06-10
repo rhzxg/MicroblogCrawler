@@ -1,6 +1,5 @@
 import urllib
 import time
-import sys
 import re
 import os
 
@@ -102,4 +101,4 @@ class Utility:
         return content
     
     def ExitProgram() -> None:
-        sys.exit(-1)
+        raise KeyboardInterrupt
