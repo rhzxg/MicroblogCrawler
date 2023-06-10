@@ -69,6 +69,8 @@ class MicrobolgCrawler:
             return True
 
     def SaveAdditionalUrlInfo(self, info: str) -> None:
+        if not os.path.exists(self.currFolderPath):
+            os.makedirs(self.currFolderPath)
         with open(self.currFolderPath + "AdditionalInfo.txt", "a", encoding="utf-8") as urlFileObject:
             urlFileObject.write(info + "\n\n")
 
