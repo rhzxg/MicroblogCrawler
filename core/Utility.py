@@ -81,20 +81,24 @@ class Utility:
     def SleepFor(sec: int) -> None:
         time.sleep(sec)
 
-    def SerializeEmojy(content: str) -> str:
+    def MakeContentReadable(content: str) -> str:
         content = content.replace("\n", "").replace(" ", "")
-
-        content = re.sub('笑cry', '[笑哭]', content)
-        content = re.sub('\[打call\]', '[打电话]', content)
-        content = re.sub('\[good\]', '[挺好]', content)
-        content = re.sub('\[ok\]', '[棒]', content)
-        content = re.sub('\[doge\]', '[狗头]', content)
-        content = re.sub('<a(.*)">@', " @", content)
-        content = re.sub('</a>:', " ", content)
         
-        images = re.findall('alt="\[([\u4e00-\u9fa5]*)\]', content)
-        for index in range(len(images)):
-            content = re.subn('<img(.*?)>', "[" + images[index] + "]", content, 1)[0]
+        # remove emoji link
+        emojis = re.findall("alt=\"(\[.*?)\]", content)
+        for index in range(len(emojis)):
+            content = re.subn("<img(.*?)>", "[" + emojis[index] + "]", content, 1)[0]
+
+        # remove tag links
+        tags = re.findall("<a[^>]*>(.*?)</a>", content)
+        for index in range(len(emojis)):
+            content = re.subn("<a[^>]*>(.*?)</a>", tags[index], content, 1)[0]
+
+        # remove at links
+        ats = re.findall("<a(.*)>@.*?</a>", content)
+        for index in range(len(ats)):
+            content = re.subn("<a(.*)>@.*?</a>", ats[index], content, 1)[0]
+        
         return content
     
     def ExitProgram() -> None:

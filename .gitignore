@@ -133,6 +133,9 @@ dmypy.json
 # web driver
 /driver
 
+# test
+/test
+
 # pyinstaller
 /build/build
 /build/dist

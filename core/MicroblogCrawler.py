@@ -115,10 +115,16 @@ class MicrobolgCrawler:
                     Utility.PrintLog("There is no more blogs! Cleaning up...", Colors.red)
                     continue
                 else:
-                    commentButton[0].click()
+                    try:
+                        commentButton[0].click()
+                    except:
+                        Utility.PrintLog("Wrong button would be clicked. Skipping...", Colors.default, True)
+                        continue
 
                 # click the show more button if there is one
                 showMoreBtnXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[3]/div/div[3]/a".format(itemNumber)
+                
+                # !something wrong here! need to fix
                 self.WaitElementLoadFinish(By.XPATH, showMoreBtnXPath)
                 showMoreButton = self.browser.find_element(By.XPATH, showMoreBtnXPath)
                 fileName = "page" + str(pageNumber) + "-item" + str(itemNumber)
@@ -146,7 +152,7 @@ class MicrobolgCrawler:
         excelSerializer = ExcelSerializer()
 
         mainContent = self.browser.find_elements(By.CLASS_NAME, "txt")[itemIndex].get_attribute("innerText")
-        mainContent = Utility.SerializeEmojy(mainContent)
+        mainContent = Utility.MakeContentReadable(mainContent)
 
         excelSerializer.WriteMainContent(mainContent)
 
@@ -181,7 +187,7 @@ class MicrobolgCrawler:
                     By.CLASS_NAME, "from")[0].get_attribute("innerText")
                 rawComment = baseNodeEle.find_elements(By.CLASS_NAME, "txt")[0].get_attribute("innerHTML")[1:].strip()
                 comment = re.sub('<a.*</a>', "", rawComment)
-                comment = Utility.SerializeEmojy(comment)
+                comment = Utility.MakeContentReadable(comment)
 
                 excelSerializer.WriteLine([contentType, likeCount, userID, userName, postTime, comment])
 
@@ -195,7 +201,7 @@ class MicrobolgCrawler:
         excelSerializer = ExcelSerializer()
 
         mainContent = self.browser.find_elements(By.CLASS_NAME, "detail_wbtext_4CRf9")[0].get_attribute("innerText")
-        mainContent = Utility.SerializeEmojy(mainContent)
+        mainContent = Utility.MakeContentReadable(mainContent)
 
         excelSerializer.WriteMainContent(mainContent)
 
@@ -280,7 +286,7 @@ class MicrobolgCrawler:
                         "innerText")
                     fcRawContent = base_wrapper.find_elements(By.TAG_NAME, "span")[-1].get_attribute(
                         "innerHTML")
-                    fcContent = Utility.SerializeEmojy(fcRawContent)
+                    fcContent = Utility.MakeContentReadable(fcRawContent)
                     
                     excelSerializer.WriteLine([fcContentType, fcLikeCount, fcUserID, fcUserName, fcPostTime, fcContent])
 
@@ -309,10 +315,10 @@ class MicrobolgCrawler:
                             fRawLikeCount = fRawContentElement.find_elements(By.CLASS_NAME, "info")[0].find_elements(
                                 By.CLASS_NAME, "woo-like-count")
                             fLikeCount = fRawLikeCount[0].get_attribute("innerText") if len(fRawLikeCount) else '0'
-                            fUserName = fRawLikeCount.find_elements(By.TAG_NAME, "a")[0].get_attribute("innerText")
+                            fUserName = fRawContentElement.find_elements(By.TAG_NAME, "a")[0].get_attribute("innerText")
                             fRawContent = fRawContentElement.find_elements(By.CLASS_NAME, "text")[0].find_elements(
                                 By.TAG_NAME, "span")[-1].get_attribute("innerHTML")
-                            fContent = Utility.SerializeEmojy(fRawContent)
+                            fContent = Utility.MakeContentReadable(fRawContent)
 
                             excelSerializer.WriteLine([fContentType, fLikeCount, fUserID, fUserName, fPostTime, fContent])
 
@@ -337,7 +343,7 @@ class MicrobolgCrawler:
                     userName = rawContentEle.find_elements(By.TAG_NAME, "a")[1].get_attribute("innerText")
                     rawContent = rawContentEle.find_elements(By.CLASS_NAME, "text")[0].find_elements(
                         By.TAG_NAME, "span")[-1].get_attribute("innerHTML")
-                    content = Utility.SerializeEmojy(rawContent)
+                    content = Utility.MakeContentReadable(rawContent)
 
                     excelSerializer.WriteLine([contentType, likeCount, userID, userName, postTime, content])
 
