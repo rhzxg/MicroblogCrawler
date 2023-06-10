@@ -43,29 +43,19 @@ class MicrobolgCrawler:
 
         self.SaveAdditionalUrlInfo(self.urlToBeCrawled)
 
-        #self.WaitPageLoadFinish()
-
         self.Login()
 
         self.Crawl()
-
-    def WaitPageLoadFinish(self) -> None:
-        try:
-            driverWait = WebDriverWait(self.browser, 60)
-            driverWait.until(lambda a: self.browser.execute_script("return document.readyState") == "complete")
-        except TimeoutException:
-            errMsg = "Timeout while waiting for the page to be loaded! Please check the network connection and restart the program!"
-            Utility.PrintLog(errMsg, Colors.red)
 
     def WaitElementLoadFinish(self, method: str, key: str, timeout : float = 60, errMsg: str = "") -> bool:
         try:
             driverWait = WebDriverWait(self.browser, timeout)
             driverWait.until(EC.presence_of_element_located((method, key)))
-            Utility.SleepFor(0.5)
+            Utility.SleepFor(Constant.TimeSpan.normal)
             return False
         except TimeoutException:
             if len(errMsg) != 0:
-                Utility.PrintLog(errMsg, Colors.red)
+                Utility.PrintLog(errMsg, Constant.Color.red)
             return True
 
     def SaveAdditionalUrlInfo(self, info: str) -> None:
@@ -93,11 +83,11 @@ class MicrobolgCrawler:
                 qrCodeImage.show()
             except:
                 errMsg = "Error occurred while getting the QR code. Please restart the program!"
-                Utility.PrintLog(errMsg, Colors.red)
+                Utility.PrintLog(errMsg, Constant.Color.red)
                 Utility.ExitProgram()
                 
             self.WaitElementLoadFinish(By.CLASS_NAME, "woo-badge-box")
-            Utility.PrintLog("Login succeeded! Redirecting...", Colors.green)
+            Utility.PrintLog("Login succeeded! Redirecting...", Constant.Color.green)
             qrCodeImage.close()
 
     def Crawl(self) -> None:
@@ -105,24 +95,24 @@ class MicrobolgCrawler:
         Utility.PrintLog("Redirecting to the page to be crawled...")
 
         pageCount = self.GetPageCount()
-        Utility.PrintLog("Found {} pages.".format(pageCount))
+        Utility.PrintLog("Found {} page(s).".format(pageCount))
         for pageNumber in range(1, pageCount + 1):
-            for itemNumber in range(1, Constants.itemsPerPage + 1):
-                Utility.PrintLog("Crawling page {}, item {}.".format(pageNumber, itemNumber), Colors.green)
+            for itemNumber in range(1, Constant.itemsPerPage + 1):
+                Utility.PrintLog("Crawling page {}, item {}.".format(pageNumber, itemNumber), Constant.Color.green)
 
-                self.WaitPageLoadFinish()
+                Utility.SleepFor(Constant.TimeSpan.normal)
 
                 # click the comment button if there is one
                 commentBtnXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[2]/ul/li[2]/a".format(itemNumber)
                 commentButton = self.browser.find_elements(By.XPATH, commentBtnXPath)
                 if len(commentButton) == 0:
-                    Utility.PrintLog("There is no more blogs! Cleaning up...", Colors.red)
+                    Utility.PrintLog("There is no more blogs! Cleaning up...", Constant.Color.red)
                     continue
                 else:
                     try:
                         commentButton[0].click()
                     except:
-                        Utility.PrintLog("Wrong button would be clicked. Skipping...", Colors.default, True)
+                        Utility.PrintLog("Wrong button would be clicked. Skipping...", Constant.Color.default, True)
                         continue
 
                 # click the show more button if there is one
@@ -136,7 +126,15 @@ class MicrobolgCrawler:
                     url = showMoreButton.get_attribute("href")
                     self.CrawlOnDetailedPage(url, fileName)
 
-        Utility.PrintLog("Program finished. Hit Enter key to exit.", Colors.blue)
+            if pageNumber < pageCount - 1:
+                # click next page button
+                nextPageBtn = self.browser.find_elements(By.CLASS_NAME, "m-page")[0].find_element(
+                    By.CLASS_NAME, "next")
+                self.browser.execute_script("window.scrollTo(0,document.body.scrollHeight);", nextPageBtn)
+                nextPageBtn.click()
+                Utility.SleepFor(Constant.TimeSpan.long)
+
+        Utility.PrintLog("Program finished. Hit Enter key to exit.", Constant.Color.blue)
         input()
         self.browser.close()
 
@@ -188,8 +186,7 @@ class MicrobolgCrawler:
                 postTime = baseNodeEle.find_elements(By.CLASS_NAME, "fun")[0].find_elements(
                     By.CLASS_NAME, "from")[0].get_attribute("innerText")
                 rawComment = baseNodeEle.find_elements(By.CLASS_NAME, "txt")[0].get_attribute("innerHTML")[1:].strip()
-                comment = re.sub('<a.*</a>', "", rawComment)
-                comment = Utility.MakeContentReadable(comment)
+                comment = Utility.MakeContentReadable(rawComment)
 
                 excelSerializer.WriteLine([contentType, likeCount, userID, userName, postTime, comment])
 
@@ -219,14 +216,9 @@ class MicrobolgCrawler:
             return
         
         hashSet = set()
-        comeToEnd = False
-        fetchedAgain = False
+        fetchTimes = 1
         btnClicked = False
-
-        while not (comeToEnd and fetchedAgain):
-            if comeToEnd:
-                fetchedAgain = True
-            
+        while fetchTimes <= Constant.fetchTimeLimit:
             self.WaitElementLoadFinish(By.CLASS_NAME, "wbpro-list")
             renderedContents = self.browser.find_elements(By.CLASS_NAME, "wbpro-list")
 
@@ -240,12 +232,12 @@ class MicrobolgCrawler:
                     postTime = rawContentEle.find_elements(By.CLASS_NAME, "info")[0].find_elements(By.TAG_NAME, "div")[0].get_attribute(
                     "innerText")
                 except:
-                    Utility.PrintLog("Element not being attached error. Skipping...", Colors.default, True)
+                    Utility.PrintLog("Element not being attached error. Skipping...", Constant.Color.default, True)
                     continue
 
                 hash = userID + postTime
                 if hash in hashSet:
-                    Utility.PrintLog("Main comment already crawled. Skipping...", Colors.default, True)
+                    Utility.PrintLog("Main comment already crawled. Skipping...", Constant.Color.default, True)
                     continue
                 hashSet.add(hash)
 
@@ -256,10 +248,10 @@ class MicrobolgCrawler:
                     try:
                         moreButton[-1].find_elements(By.CLASS_NAME, "woo-font")[0].click()
                     except:
-                        print("Wrong button would be clicked. Skipping...", Colors.default, True)
+                        print("Wrong button would be clicked. Skipping...", Constant.Color.default, True)
                         continue
 
-                    Utility.PrintLog("Opening a frame for more info...", Colors.default, True)
+                    Utility.PrintLog("Opening a frame for more info...", Constant.Color.default, True)
 
                     if not btnClicked:
                         try:
@@ -282,7 +274,7 @@ class MicrobolgCrawler:
                         By.CLASS_NAME, "info")[0].find_elements(By.CLASS_NAME, "woo-like-count")
                     fcLikeCount = fcRawLikeCount[0].get_attribute("innerText") if len(fcRawLikeCount) else "0"
                     fcUserID = base_wrapper.find_elements(By.TAG_NAME, "a")[0].get_attribute("href")[20:]
-                    fcUserName = base_wrapper.find_elements(By.TAG_NAME, "a")[0].get_attribute("innerText")
+                    fcUserName = base_wrapper.find_elements(By.TAG_NAME, "a")[0].get_attribute("innerText").lstrip()
                     fcPostTime = fBaseNodeEle.find_elements(By.CLASS_NAME, "item1in")[0].find_elements(
                         By.CLASS_NAME, "info")[0].find_elements(By.TAG_NAME, "div")[0].get_attribute(
                         "innerText")
@@ -294,12 +286,8 @@ class MicrobolgCrawler:
 
                     # dump the replies in the frame
                     fHashSet = set()
-                    fComeToEnd = False
-                    fFetchedAgain = False
-                    while not (fComeToEnd and fFetchedAgain):                      
-                        if (fComeToEnd):
-                            fFetchedAgain = True
-
+                    fFetchTimes = 1
+                    while fFetchTimes <= Constant.fetchTimeLimit:                      
                         fRenderedContents = fBaseNodeEle.find_elements(By.CLASS_NAME, "vue-recycle-scroller__item-view")
                         for fIndex in range(len(fRenderedContents)):
                             fRawContentElement = fRenderedContents[fIndex]
@@ -309,7 +297,7 @@ class MicrobolgCrawler:
                             
                             fHash = fUserID + fPostTime
                             if fHash in fHashSet:
-                                Utility.PrintLog("Reply already crawled, skipping...", Colors.default, True)
+                                Utility.PrintLog("Reply already crawled, skipping...", Constant.Color.default, True)
                                 continue
                             fHashSet.add(fHash)
 
@@ -328,9 +316,10 @@ class MicrobolgCrawler:
                             'scrollTop')
                         self.browser.execute_script(
                             "document.getElementsByClassName('ReplyModal_scroll3_2kADQ')[0].scrollBy(0, 500)")
+                        Utility.SleepFor(Constant.TimeSpan.normal)
                         if fYAxis == self.browser.find_elements(By.CLASS_NAME, "ReplyModal_scroll3_2kADQ")[0].get_attribute(
                                 'scrollTop'):
-                            fComeToEnd = True
+                            fFetchTimes += 1
 
                     # don't forget to close this frame.
                     self.browser.find_elements(By.CLASS_NAME, "wbpro-layer")[0].find_elements(By.TAG_NAME, "i")[0].click()
@@ -351,11 +340,12 @@ class MicrobolgCrawler:
 
             yAxis = self.browser.find_elements(By.TAG_NAME, "html")[0].get_attribute("scrollTop")
             self.browser.execute_script("window.scrollBy(0,500);")
+            Utility.SleepFor(Constant.TimeSpan.normal)
             if yAxis == self.browser.find_elements(By.TAG_NAME, "html")[0].get_attribute("scrollTop"):
-                comeToEnd = True
+                fetchTimes += 1
 
         excelSerializer.Save(self.currFolderPath, fileName)
         excelSerializer.Close()
         
-        Utility.PrintLog("Current page is finished. Redirecting back...", Colors.default, True)
+        Utility.PrintLog("Current page is finished. Redirecting back...\n", Constant.Color.default, True)
         self.browser.back()

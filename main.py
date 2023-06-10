@@ -5,4 +5,4 @@ if __name__ == "__main__":
     try:
         crawler = MicrobolgCrawler()
     except KeyboardInterrupt:
-        Utility.PrintLog("Program stopped by force!", Colors.red)
+        Utility.PrintLog("Program stopped by force!", Constant.Color.red)

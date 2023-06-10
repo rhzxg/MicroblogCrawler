@@ -1,19 +1,27 @@
-import urllib
-import time
 import re
 import os
-
-# Colors
-class Colors:
-    red = 31
-    green = 32
-    yellow = 33
-    blue = 34
-    default = 38
+import sys
+import time
+import urllib
 
 # Constants
-class Constants:
+class Constant:
     itemsPerPage = 20
+    fetchTimeLimit = 3
+
+    # Colors
+    class Color:
+        red = 31
+        green = 32
+        yellow = 33
+        blue = 34
+        default = 38
+    
+    # Time spans
+    class TimeSpan:
+        short = 0.5
+        normal = 1
+        long = 2
 
 # Global variables
 class GlobalVariables:
@@ -22,7 +30,7 @@ class GlobalVariables:
 class Utility:
     def TrimUrl(url: str) -> str:
         if len(re.findall(r"%23.*%23", url)) == 0 or len(re.findall(r"weibo\?q=", url)) == 0:
-            Utility.PrintLog("The url is incorrect! Program exiting...", Colors.red)
+            Utility.PrintLog("The url is incorrect! Program exiting...", Constant.Color.red)
             Utility.ExitProgram()
 
         url = url.replace("weibo?q=", "hot?q=")
@@ -57,7 +65,7 @@ class Utility:
         except:
             pass
 
-    def PrintLog(log: str, color: int = Colors.default, overwrite: bool = False) -> None:
+    def PrintLog(log: str, color: int = Constant.Color.default, overwrite: bool = False) -> None:
         if GlobalVariables.prevLog == log: 
             return
         prevLogLength = len(GlobalVariables.prevLog)
@@ -69,11 +77,14 @@ class Utility:
         # make log overlap
         logWithColor = colorPrefix + log + colorSuffix
         if overwrite:
-            logWithColor = "\r" + logWithColor
+            sys.stdout.write("\r")
             if len(log) < prevLogLength:
                 logWithColor += " " * (prevLogLength - currLogLength)
+        else:
+            logWithColor += "\n"
         
-        print(logWithColor)
+        sys.stdout.write(logWithColor)
+        sys.stdout.flush()
 
         GlobalVariables.prevLog = log
 
@@ -84,21 +95,22 @@ class Utility:
         content = content.replace("\n", "").replace(" ", "")
         
         # remove emoji link
-        emojis = re.findall("alt=\"(\[.*?)\]", content)
+        emojis = re.findall("alt=\"\[(.*?)\]", content)
         for index in range(len(emojis)):
             content = re.subn("<img(.*?)>", "[" + emojis[index] + "]", content, 1)[0]
-
-        # remove tag links
-        tags = re.findall("<a[^>]*>(.*?)</a>", content)
-        for index in range(len(emojis)):
-            content = re.subn("<a[^>]*>(.*?)</a>", tags[index], content, 1)[0]
 
         # remove at links
         ats = re.findall("<a(.*)>@.*?</a>", content)
         for index in range(len(ats)):
-            content = re.subn("<a(.*)>@.*?</a>", ats[index], content, 1)[0]
-        
+            content = re.subn("<a(.*)>@.*?</a>", ats[index] + " ", content, 1)[0]
+
+        # remove tag links
+        tags = re.findall("<a[^>]*>(.*?)</a>", content)
+        for index in range(len(tags)):
+            content = re.subn("<a[^>]*>(.*?)</a>", tags[index], content, 1)[0]
+
         return content
     
     def ExitProgram() -> None:
-        raise KeyboardInterrupt
+        input()
+        sys.exit(-1)

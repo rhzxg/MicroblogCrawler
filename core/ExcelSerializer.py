@@ -9,14 +9,14 @@ class ExcelSerializer:
         try:
             self.excelApp = Excel.App(False, False)
         except:
-            Utility.PrintLog("Excel is not installed properly on this computer! Program exiting...", Colors.red)
+            Utility.PrintLog("Excel is not installed properly on this computer! Program exiting...", Constant.Color.red)
             Utility.ExitProgram()
 
         self.excelApp.display_alerts = False    
         self.excelApp.screen_updating = False
 
         self.excelBook = self.excelApp.books.add()
-        self.excelSheet = self.excelBook.sheets.add()
+        self.excelSheet = self.excelBook.sheets["sheet1"]
 
         self.excelSheet.range("A:F").api.NumberFormat ="@"
         self.excelSheet.range("A1:F1").api.Merge()
