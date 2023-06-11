@@ -248,7 +248,7 @@ class MicrobolgCrawler:
                     try:
                         moreButton[-1].find_elements(By.CLASS_NAME, "woo-font")[0].click()
                     except:
-                        print("Wrong button would be clicked. Skipping...", Constant.Color.default, True)
+                        Utility.PrintLog("Wrong button would be clicked. Skipping...", Constant.Color.default, True)
                         continue
 
                     Utility.PrintLog("Opening a frame for more info...", Constant.Color.default, True)
@@ -320,6 +320,8 @@ class MicrobolgCrawler:
                         if fYAxis == self.browser.find_elements(By.CLASS_NAME, "ReplyModal_scroll3_2kADQ")[0].get_attribute(
                                 'scrollTop'):
                             fFetchTimes += 1
+                        else:
+                            fFetchTimes = 1
 
                     # don't forget to close this frame.
                     self.browser.find_elements(By.CLASS_NAME, "wbpro-layer")[0].find_elements(By.TAG_NAME, "i")[0].click()
@@ -343,6 +345,8 @@ class MicrobolgCrawler:
             Utility.SleepFor(Constant.TimeSpan.normal)
             if yAxis == self.browser.find_elements(By.TAG_NAME, "html")[0].get_attribute("scrollTop"):
                 fetchTimes += 1
+            else:
+                fetchTimes = 1
 
         excelSerializer.Save(self.currFolderPath, fileName)
         excelSerializer.Close()

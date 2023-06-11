@@ -99,15 +99,13 @@ class Utility:
         for index in range(len(emojis)):
             content = re.subn("<img(.*?)>", "[" + emojis[index] + "]", content, 1)[0]
 
-        # remove at links
-        ats = re.findall("<a(.*)>@.*?</a>", content)
-        for index in range(len(ats)):
-            content = re.subn("<a(.*)>@.*?</a>", ats[index] + " ", content, 1)[0]
-
-        # remove tag links
+        # remove <a></a> tag links
         tags = re.findall("<a[^>]*>(.*?)</a>", content)
         for index in range(len(tags)):
-            content = re.subn("<a[^>]*>(.*?)</a>", tags[index], content, 1)[0]
+            content = re.subn("<a[^>]*>(.*?)</a>", tags[index] + " ", content, 1)[0]
+
+        # remove <img> tag links
+        content = re.sub("<img(.*)>", "", content)
 
         return content
     
