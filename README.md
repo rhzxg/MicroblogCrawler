@@ -31,11 +31,11 @@ BTW: Uninstall WPS software kit to avoid strange errors.
 
 **Step3:**
 
-Run main.py or executable files in ReleasePage if you do not have the Python environment.
+Run main.py or executable files in [ReleasePage](https://github.com/CodingDogzxg/MicroblogCrawler/releases) if you do not have the Python environment.
 
 如果你有Python环境，运行main.py
 
-如果你跳过了步骤1，直接运行ReleasePage里的可执行文件
+如果你跳过了步骤1，直接运行[ReleasePage](https://github.com/CodingDogzxg/MicroblogCrawler/releases)里的可执行文件
 
 **Step4:**
 
