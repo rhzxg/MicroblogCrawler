@@ -50,3 +50,6 @@ https://s.weibo.com/weibo?q=xxx
 # 正确网址示例
 https://s.weibo.com/weibo?q=xxx
 ```
+
+**Crawled:**
+![Crawled example image](https://github.com/CodingDogzxg/MicroblogCrawler/assets/49633098/8c75fb81-fc9b-4344-9666-e1140c9e2669)
