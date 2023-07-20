@@ -55,4 +55,7 @@ https://s.weibo.com/weibo?q=xxx
 ![Crawled example image](https://github.com/CodingDogzxg/MicroblogCrawler/assets/49633098/8c75fb81-fc9b-4344-9666-e1140c9e2669)
 
 
-[Buy me a cup of coffee.](https://ko-fi.com/codingdog)
+<a href="https://ko-fi.com/codingdog" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
+<a href="https://bmc.link/codingdog" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
