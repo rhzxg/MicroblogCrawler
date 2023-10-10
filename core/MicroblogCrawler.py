@@ -4,12 +4,15 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
-from .Utility import *
-from .ExcelSerializer import *
+from core.Utility import *
+from core.ExcelSerializer import *
+from core.CookieManager import *
 import PIL.Image
 import urllib.parse
 import urllib.request
 import io
+import json
+import pyperclip
 
 class MicrobolgCrawler:
     def __init__(self) -> None:
@@ -18,7 +21,7 @@ class MicrobolgCrawler:
 
     def Initialize(self):
         self.currFolderPath = "ErrorFolder"
-        self.parentFolder = "crawled/"
+        self.parentFolder = "./crawled/"
 
         edgeOptions = webdriver.EdgeOptions()
         edgeOptions.add_experimental_option("excludeSwitches", ["enable-logging"])
@@ -27,8 +30,11 @@ class MicrobolgCrawler:
             edgeOptions.use_chromium = True # is this necessary?
             noImageConfig = {"profile.managed_default_content_settings.images": 2}
             edgeOptions.add_experimental_option("prefs", noImageConfig)
-
-        self.urlToBeCrawled = Utility.TrimUrl(input("Input a Microblog link: "))
+            edgeOptions.add_argument('--no-proxy-server') # disable proxy
+        
+        url = input("Input a Microblog link: ")
+        self.crawlMode = Utility.DetectCrawlMode(url)
+        self.urlToBeCrawled = Utility.TrimUrl(url, self.crawlMode)
 
         webDriverPath = EdgeChromiumDriverManager(path="driver/").install()
         self.browser = webdriver.Edge(webDriverPath, options=edgeOptions)
@@ -36,12 +42,9 @@ class MicrobolgCrawler:
     def StartSession(self) -> None:
         self.browser.delete_all_cookies()
         self.browser.get("https://weibo.com/login.php")
-
-        childFolder = Utility.UnquoteDirectoryFromUrl(self.urlToBeCrawled)
-        self.currFolderPath = self.parentFolder + childFolder + "/"
+        childFolder = Utility.UnquoteDirectoryFromUrl(self.urlToBeCrawled, self.crawlMode)
+        self.currFolderPath = os.path.join(self.parentFolder, childFolder)
         Utility.CreateFolder(self.currFolderPath)
-
-        self.SaveAdditionalUrlInfo(self.urlToBeCrawled)
 
         self.Login()
 
@@ -58,81 +61,89 @@ class MicrobolgCrawler:
                 Utility.PrintLog(errMsg, Constant.Color.red)
             return True
 
-    def SaveAdditionalUrlInfo(self, info: str) -> None:
-        if not os.path.exists(self.currFolderPath):
-            os.makedirs(self.currFolderPath)
-        with open(self.currFolderPath + "AdditionalInfo.txt", "a", encoding="utf-8") as urlFileObject:
-            urlFileObject.write(info + "\n\n")
-
     def Login(self) -> None:
-            qrCodeImage = None
-            try:
-                loginBtnPath = r"/html/body/div[1]/div[1]/div/div[1]/div/div/div[3]/div[2]/ul/li[3]/a"
-                self.WaitElementLoadFinish(By.XPATH, loginBtnPath)
-                self.browser.find_element(By.XPATH, loginBtnPath).click()
+            cookieManager = CookieManager()
+            cookies = cookieManager.ReadCookies()
+            if len(cookies) != 0:
+                for cookie in cookies:
+                    self.browser.add_cookie(cookie)
+                self.browser.refresh()
+                Utility.PrintLog("Login succeeded by using cookies! Redirecting...", Constant.Color.green)
+            else:
+                qrCodeImage = None
+                try:
+                    loginBtnPath = r"/html/body/div[1]/div[1]/div/div[1]/div/div/div[3]/div[2]/ul/li[3]/a"
+                    self.WaitElementLoadFinish(By.XPATH, loginBtnPath)
+                    self.browser.find_element(By.XPATH, loginBtnPath).click()
 
-                self.WaitElementLoadFinish(By.CLASS_NAME, "tab_bar")
-                self.browser.find_elements(By.CLASS_NAME, "tab_bar")[0].find_elements(By.TAG_NAME, "a")[1].click()
-                
-                qrCodeEleXpath = "/html/body/div[4]/div[2]/div[3]/div[2]/div[1]/img"
-                self.WaitElementLoadFinish(By.XPATH, qrCodeEleXpath)
-                qrCodeEle = self.browser.find_element(By.XPATH, qrCodeEleXpath)
-                qrCodeUrl = qrCodeEle.get_attribute("src")
-                response = urllib.request.urlopen(qrCodeUrl)
-                qrCodeImage = PIL.Image.open(io.BytesIO(response.read()))
-                qrCodeImage.show()
-            except:
-                errMsg = "Error occurred while getting the QR code. Please restart the program!"
-                Utility.PrintLog(errMsg, Constant.Color.red)
-                Utility.ExitProgram()
-                
-            self.WaitElementLoadFinish(By.CLASS_NAME, "woo-badge-box")
-            Utility.PrintLog("Login succeeded! Redirecting...", Constant.Color.green)
-            qrCodeImage.close()
+                    self.WaitElementLoadFinish(By.CLASS_NAME, "tab_bar")
+                    self.browser.find_elements(By.CLASS_NAME, "tab_bar")[0].find_elements(By.TAG_NAME, "a")[1].click()
+                    
+                    qrCodeEleXpath = "/html/body/div[4]/div[2]/div[3]/div[2]/div[1]/img"
+                    self.WaitElementLoadFinish(By.XPATH, qrCodeEleXpath)
+                    qrCodeEle = self.browser.find_element(By.XPATH, qrCodeEleXpath)
+                    qrCodeUrl = qrCodeEle.get_attribute("src")
+                    response = urllib.request.urlopen(qrCodeUrl)
+                    qrCodeImage = PIL.Image.open(io.BytesIO(response.read()))
+                    qrCodeImage.show()
+                except:
+                    errMsg = "Error occurred while getting the QR code. Please restart the program!"
+                    Utility.PrintLog(errMsg, Constant.Color.red)
+                    Utility.ExitProgram()
+
+                self.WaitElementLoadFinish(By.CLASS_NAME, "woo-badge-box")
+                Utility.PrintLog("Login succeeded! Redirecting...", Constant.Color.green)
+                qrCodeImage.close()
+
+                cookieManager.SaveCookies(self.browser.get_cookies())
 
     def Crawl(self) -> None:
-        self.browser.get(self.urlToBeCrawled)
-        Utility.PrintLog("Redirecting to the page to be crawled...")
+        if self.crawlMode == Constant.CrawlMode.singleItem:
+            formatedTime = time.strftime("%Y%m%d%H%M%S", time.localtime())
+            self.CrawlOnDetailedPage(self.urlToBeCrawled, formatedTime)
+        elif self.crawlMode == Constant.CrawlMode.multiItem:
+            self.browser.get(self.urlToBeCrawled)
+            Utility.PrintLog("Redirecting to the page to be crawled...")
 
-        pageCount = self.GetPageCount()
-        Utility.PrintLog("Found {} page(s).".format(pageCount))
-        for pageNumber in range(1, pageCount + 1):
-            for itemNumber in range(1, Constant.itemsPerPage + 1):
-                Utility.PrintLog("Crawling page {}, item {}.".format(pageNumber, itemNumber), Constant.Color.green)
+            pageCount = self.GetPageCount()
+            Utility.PrintLog("Found {} page(s).".format(pageCount))
+            for pageNumber in range(1, pageCount + 1):
+                for itemNumber in range(1, Constant.itemsPerPage + 1):
+                    Utility.PrintLog("Crawling page {}, item {}.".format(pageNumber, itemNumber), Constant.Color.green)
 
-                Utility.SleepFor(Constant.TimeSpan.normal)
+                    Utility.SleepFor(Constant.TimeSpan.normal)
 
-                # click the comment button if there is one
-                commentBtnXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[2]/ul/li[2]/a".format(itemNumber)
-                commentButton = self.browser.find_elements(By.XPATH, commentBtnXPath)
-                if len(commentButton) == 0:
-                    Utility.PrintLog("There is no more blogs! Cleaning up...", Constant.Color.red)
-                    continue
-                else:
-                    try:
-                        commentButton[0].click()
-                    except:
-                        Utility.PrintLog("Wrong button would be clicked. Skipping...", Constant.Color.default, True)
+                    # click the comment button if there is one
+                    commentBtnXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[2]/ul/li[2]/a".format(itemNumber)
+                    commentButton = self.browser.find_elements(By.XPATH, commentBtnXPath)
+                    if len(commentButton) == 0:
+                        Utility.PrintLog("There is no more blogs! Cleaning up...", Constant.Color.red)
                         continue
+                    else:
+                        try:
+                            commentButton[0].click()
+                        except:
+                            Utility.PrintLog("Wrong button would be clicked. Skipping...", Constant.Color.default, True)
+                            continue
 
-                # click the show more button if there is one
-                showMoreBtnXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[3]/div/div[3]/a".format(itemNumber)
-                timeout = self.WaitElementLoadFinish(By.XPATH, showMoreBtnXPath, 5)
-                fileName = "page" + str(pageNumber) + "-item" + str(itemNumber)
-                if timeout:
-                    self.CrawlOnCurrentPage(itemNumber - 1, fileName)
-                else:
-                    showMoreButton = self.browser.find_element(By.XPATH, showMoreBtnXPath)
-                    url = showMoreButton.get_attribute("href")
-                    self.CrawlOnDetailedPage(url, fileName)
+                    # click the show more button if there is one
+                    showMoreBtnXPath = "/html/body/div[1]/div[2]/div/div[2]/div[1]/div[3]/div[{}]/div/div[3]/div/div[3]/a".format(itemNumber)
+                    timeout = self.WaitElementLoadFinish(By.XPATH, showMoreBtnXPath, 5)
+                    fileName = "page" + str(pageNumber) + "-item" + str(itemNumber)
+                    if timeout:
+                        self.CrawlOnCurrentPage(itemNumber - 1, fileName)
+                    else:
+                        showMoreButton = self.browser.find_element(By.XPATH, showMoreBtnXPath)
+                        url = showMoreButton.get_attribute("href")
+                        self.CrawlOnDetailedPage(url, fileName)
 
-            if pageNumber < pageCount - 1:
-                # click next page button
-                nextPageBtn = self.browser.find_elements(By.CLASS_NAME, "m-page")[0].find_element(
-                    By.CLASS_NAME, "next")
-                self.browser.execute_script("window.scrollTo(0,document.body.scrollHeight);", nextPageBtn)
-                nextPageBtn.click()
-                Utility.SleepFor(Constant.TimeSpan.long)
+                if pageNumber < pageCount - 1:
+                    # click next page button
+                    nextPageBtn = self.browser.find_elements(By.CLASS_NAME, "m-page")[0].find_element(
+                        By.CLASS_NAME, "next")
+                    self.browser.execute_script("window.scrollTo(0,document.body.scrollHeight);", nextPageBtn)
+                    nextPageBtn.click()
+                    Utility.SleepFor(Constant.TimeSpan.long)
 
         Utility.PrintLog("Program finished. Hit Enter key to exit.", Constant.Color.blue)
         input()
@@ -145,6 +156,35 @@ class MicrobolgCrawler:
             return 1 if (len(pages)) == 0 else len(pages)
         except:
             return 1
+        
+    def GetUserGenderByID(self, userID: str) -> str:
+        if userID in GlobalVariables.id2GenderDict:
+            return GlobalVariables.id2GenderDict[userID]
+
+        GlobalVariables.id2GenderDict[userID] = "Unknown"
+        api = "https://weibo.com/ajax/profile/info?uid=" + userID
+        try:
+            self.browser.execute_script("window.open('" + api + "', '_blank');")
+            self.browser.switch_to.window(self.browser.window_handles[1])
+            # it may take longer to call this api for the first time
+            # then normally it would not take more than 300ms
+            userInfoXPath = "/html/body/div[1]"
+            self.WaitElementLoadFinish(By.XPATH, userInfoXPath, Constant.TimeSpan.timeout)
+            rawUserInfo = self.browser.find_elements(By.XPATH, userInfoXPath)[0].get_attribute("innerText")
+            userInfoJson = json.loads(rawUserInfo)
+            genderDesc = userInfoJson.get("data", {}).get("user", {}).get("gender", "Unknown")
+            if genderDesc == "m":
+                GlobalVariables.id2GenderDict[userID] = "Male"
+            elif genderDesc == "f":
+                GlobalVariables.id2GenderDict[userID] = "Female"
+        except:
+            Utility.PrintLog("Get user gender timed out! Skipping...", Constant.Color.yellow)
+        finally:
+            self.browser.close()
+            self.browser.switch_to.window(self.browser.window_handles[0])
+            
+        return GlobalVariables.id2GenderDict[userID]
+
 
     def CrawlOnCurrentPage(self, itemIndex: int, fileName: str) -> None:
         Utility.PrintLog("Crawling on current page...")
@@ -154,7 +194,12 @@ class MicrobolgCrawler:
         mainContent = self.browser.find_elements(By.CLASS_NAME, "txt")[itemIndex].get_attribute("innerText")
         mainContent = Utility.MakeContentReadable(mainContent)
 
-        excelSerializer.WriteMainContent(mainContent)
+        # call anonymous JavaScript function to copy the real url 
+        self.browser.find_elements(By.CSS_SELECTOR, ".menu.s-fr")[itemIndex].find_elements(
+            By.TAG_NAME, "li")[3].find_elements(By.TAG_NAME, "a")[0].click()
+        microblogUrl = pyperclip.paste()
+
+        excelSerializer.WriteMainContent(mainContent, microblogUrl)
 
         comments = None
         exception = False
@@ -165,7 +210,7 @@ class MicrobolgCrawler:
             exception = True
 
         if exception or len(comments) == 0:
-            excelSerializer.WriteLine(["", "", "", "", "", "No one commented on this blog."])
+            excelSerializer.WriteLine(["", "", "", "", "", "", "No one commented on this blog."])
             excelSerializer.Save(self.currFolderPath, fileName)
             excelSerializer.Close()
             return
@@ -180,15 +225,19 @@ class MicrobolgCrawler:
                 # What we need is only the xxx between u/ and ?refer.
                 rawUserID = baseNodeEle.find_elements(By.CLASS_NAME, "txt")[0].find_elements(
                     By.TAG_NAME, "a")[0].get_attribute("href")
-                userID = re.findall('/u/[0-9]*\?', rawUserID)[0][3:-1]
+                userID = re.search('/u/(\d+)', rawUserID).group(1)
                 userName = baseNodeEle.find_elements(By.CLASS_NAME, "txt")[0].find_elements(
                     By.TAG_NAME, "a")[0].get_attribute("innerText")
-                postTime = baseNodeEle.find_elements(By.CLASS_NAME, "fun")[0].find_elements(
+                userGender = self.GetUserGenderByID(userID)
+                mixedTimeIP = baseNodeEle.find_elements(By.CLASS_NAME, "fun")[0].find_elements(
                     By.CLASS_NAME, "from")[0].get_attribute("innerText")
+                seperatedTimeIP = Utility.SeperateTimeAndIPAddress(mixedTimeIP)
+                postTime = seperatedTimeIP[0]
+                ipAddress = seperatedTimeIP[1]
                 rawComment = baseNodeEle.find_elements(By.CLASS_NAME, "txt")[0].get_attribute("innerHTML")[1:].strip()
                 comment = Utility.MakeContentReadable(rawComment)
-
-                excelSerializer.WriteLine([contentType, likeCount, userID, userName, postTime, comment])
+                
+                excelSerializer.WriteLine([contentType, likeCount, userID, userName, userGender, postTime, ipAddress, comment])
 
         excelSerializer.Save(self.currFolderPath, fileName)
         excelSerializer.Close()
@@ -202,13 +251,13 @@ class MicrobolgCrawler:
         mainContent = self.browser.find_elements(By.CLASS_NAME, "detail_wbtext_4CRf9")[0].get_attribute("innerText")
         mainContent = Utility.MakeContentReadable(mainContent)
 
-        excelSerializer.WriteMainContent(mainContent)
+        excelSerializer.WriteMainContent(mainContent, url)
 
         unavailableXPath = "/html/body/div/div[1]/div[2]/div[2]/main/div[1]/div/div[2]/div[2]/div[3]/div[2]"
         if len(self.browser.find_elements(By.XPATH, unavailableXPath)):
             Utility.PrintLog("The comments on this page are unavailable. Skipping...")
 
-            excelSerializer.WriteMainContent(["", "", "", "", "", "Comments are unavailable."])
+            excelSerializer.WriteLine(["", "", "", "", "", "", "Comments are unavailable."])
             excelSerializer.Save(self.currFolderPath, fileName)
             excelSerializer.Close()
             
@@ -228,9 +277,14 @@ class MicrobolgCrawler:
                 postTime = None
                 try:
                     rawContentEle = renderedContents[index]
-                    userID = rawContentEle.find_elements(By.TAG_NAME, "a")[1].get_attribute("href")[20:]
-                    postTime = rawContentEle.find_elements(By.CLASS_NAME, "info")[0].find_elements(By.TAG_NAME, "div")[0].get_attribute(
+                    rawUserID = rawContentEle.find_elements(By.TAG_NAME, "a")[1].get_attribute("href")
+                    userID = re.search('/u/(\d+)', rawUserID).group(1)
+                    mixedTimeIP = rawContentEle.find_elements(By.CLASS_NAME, "info")[0].find_elements(By.TAG_NAME, "div")[0].get_attribute(
                     "innerText")
+                    seperatedTimeIP = Utility.SeperateTimeAndIPAddress(mixedTimeIP)
+                    postTime = seperatedTimeIP[0]
+                    ipAddress = seperatedTimeIP[1]
+
                 except:
                     Utility.PrintLog("Element not being attached error. Skipping...", Constant.Color.default, True)
                     continue
@@ -273,16 +327,21 @@ class MicrobolgCrawler:
                     fcRawLikeCount = fBaseNodeEle.find_elements(By.CLASS_NAME, "item1in")[0].find_elements(
                         By.CLASS_NAME, "info")[0].find_elements(By.CLASS_NAME, "woo-like-count")
                     fcLikeCount = fcRawLikeCount[0].get_attribute("innerText") if len(fcRawLikeCount) else "0"
-                    fcUserID = base_wrapper.find_elements(By.TAG_NAME, "a")[0].get_attribute("href")[20:]
+                    rawFcUserID = base_wrapper.find_elements(By.TAG_NAME, "a")[0].get_attribute("href")
+                    fcUserID = re.search('/u/(\d+)', rawFcUserID).group(1)
                     fcUserName = base_wrapper.find_elements(By.TAG_NAME, "a")[0].get_attribute("innerText").lstrip()
-                    fcPostTime = fBaseNodeEle.find_elements(By.CLASS_NAME, "item1in")[0].find_elements(
+                    fcUserGender = self.GetUserGenderByID(fcUserID)
+                    fcMixedTimeIP = fBaseNodeEle.find_elements(By.CLASS_NAME, "item1in")[0].find_elements(
                         By.CLASS_NAME, "info")[0].find_elements(By.TAG_NAME, "div")[0].get_attribute(
                         "innerText")
+                    fcSeperatedTimeIP = Utility.SeperateTimeAndIPAddress(fcMixedTimeIP)
+                    fcPostTime = fcSeperatedTimeIP[0]
+                    fcIPAddress = fcSeperatedTimeIP[1]
                     fcRawContent = base_wrapper.find_elements(By.TAG_NAME, "span")[-1].get_attribute(
                         "innerHTML")
                     fcContent = Utility.MakeContentReadable(fcRawContent)
                     
-                    excelSerializer.WriteLine([fcContentType, fcLikeCount, fcUserID, fcUserName, fcPostTime, fcContent])
+                    excelSerializer.WriteLine([fcContentType, fcLikeCount, fcUserID, fcUserName, fcUserGender, fcPostTime, fcIPAddress, fcContent])
 
                     # dump the replies in the frame
                     fHashSet = set()
@@ -291,9 +350,13 @@ class MicrobolgCrawler:
                         fRenderedContents = fBaseNodeEle.find_elements(By.CLASS_NAME, "vue-recycle-scroller__item-view")
                         for fIndex in range(len(fRenderedContents)):
                             fRawContentElement = fRenderedContents[fIndex]
-                            fUserID = fRawContentElement.find_elements(By.TAG_NAME, "a")[0].get_attribute("href")[20:]
-                            fPostTime = fRawContentElement.find_elements(By.CLASS_NAME, "info")[0].find_elements(
+                            rawFUserID = fRawContentElement.find_elements(By.TAG_NAME, "a")[0].get_attribute("href")
+                            fUserID = re.search('/u/(\d+)', rawFUserID).group(1)
+                            fMixedTimeIP = fRawContentElement.find_elements(By.CLASS_NAME, "info")[0].find_elements(
                                 By.TAG_NAME, "div")[0].get_attribute("innerText")
+                            fSeperatedTimeIP = Utility.SeperateTimeAndIPAddress(fMixedTimeIP)
+                            fPostTime = fSeperatedTimeIP[0]
+                            fIPAddress = fSeperatedTimeIP[1]
                             
                             fHash = fUserID + fPostTime
                             if fHash in fHashSet:
@@ -306,16 +369,17 @@ class MicrobolgCrawler:
                                 By.CLASS_NAME, "woo-like-count")
                             fLikeCount = fRawLikeCount[0].get_attribute("innerText") if len(fRawLikeCount) else '0'
                             fUserName = fRawContentElement.find_elements(By.TAG_NAME, "a")[0].get_attribute("innerText")
+                            fUserGender = self.GetUserGenderByID(fUserID)
                             fRawContent = fRawContentElement.find_elements(By.CLASS_NAME, "text")[0].find_elements(
                                 By.TAG_NAME, "span")[-1].get_attribute("innerHTML")
                             fContent = Utility.MakeContentReadable(fRawContent)
 
-                            excelSerializer.WriteLine([fContentType, fLikeCount, fUserID, fUserName, fPostTime, fContent])
+                            excelSerializer.WriteLine([fContentType, fLikeCount, fUserID, fUserName, fUserGender, fPostTime, fIPAddress, fContent])
 
                         fYAxis = self.browser.find_elements(By.CLASS_NAME, "ReplyModal_scroll3_2kADQ")[0].get_attribute(
                             'scrollTop')
                         self.browser.execute_script(
-                            "document.getElementsByClassName('ReplyModal_scroll3_2kADQ')[0].scrollBy(0, 500)")
+                            "document.getElementsByClassName('ReplyModal_scroll3_2kADQ')[0].scrollBy(0, 250)")
                         Utility.SleepFor(Constant.TimeSpan.normal)
                         if fYAxis == self.browser.find_elements(By.CLASS_NAME, "ReplyModal_scroll3_2kADQ")[0].get_attribute(
                                 'scrollTop'):
@@ -334,14 +398,15 @@ class MicrobolgCrawler:
                             By.CLASS_NAME, "info")[0].find_elements(By.CLASS_NAME, "woo-like-count")
                     likeCount = rawLikeCount[0].get_attribute("innerText") if len(rawLikeCount) else '0'
                     userName = rawContentEle.find_elements(By.TAG_NAME, "a")[1].get_attribute("innerText")
+                    userGender = self.GetUserGenderByID(userID)
                     rawContent = rawContentEle.find_elements(By.CLASS_NAME, "text")[0].find_elements(
                         By.TAG_NAME, "span")[-1].get_attribute("innerHTML")
                     content = Utility.MakeContentReadable(rawContent)
 
-                    excelSerializer.WriteLine([contentType, likeCount, userID, userName, postTime, content])
+                    excelSerializer.WriteLine([contentType, likeCount, userID, userName, userGender, postTime, ipAddress, content])
 
             yAxis = self.browser.find_elements(By.TAG_NAME, "html")[0].get_attribute("scrollTop")
-            self.browser.execute_script("window.scrollBy(0,500);")
+            self.browser.execute_script("window.scrollBy(0, 250);")
             Utility.SleepFor(Constant.TimeSpan.normal)
             if yAxis == self.browser.find_elements(By.TAG_NAME, "html")[0].get_attribute("scrollTop"):
                 fetchTimes += 1

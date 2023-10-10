@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# vscode
+.vscode/
+
 # C extensions
 *.so
 
@@ -132,6 +135,9 @@ dmypy.json
 
 # web driver
 /driver
+
+# cookies
+*.cookies
 
 # test
 /test
