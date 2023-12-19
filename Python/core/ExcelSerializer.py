@@ -45,7 +45,7 @@ class ExcelSerializer:
 
         # hyper link
         excelCellG = self.excelSheet.range("H1")
-        excelCellG.api.Hyperlinks.Add(Anchor=excelCellG.api, Address=hyperLink, TextToDisplay="Click to visit original Microblog.")
+        excelCellG.api.Hyperlinks.Add(Anchor=excelCellG.api, Address=hyperLink, TextToDisplay="Click to visit the original Microblog.")
         
 
     def WriteLine(self, values: list) -> None:

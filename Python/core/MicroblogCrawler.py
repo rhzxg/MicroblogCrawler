@@ -24,13 +24,11 @@ class MicrobolgCrawler:
         self.parentFolder = "./crawled/"
 
         edgeOptions = webdriver.EdgeOptions()
-        edgeOptions.add_experimental_option("excludeSwitches", ["enable-logging"])
-        self.noImageMode = True
-        if self.noImageMode:
-            edgeOptions.use_chromium = True # is this necessary?
-            noImageConfig = {"profile.managed_default_content_settings.images": 2}
-            edgeOptions.add_experimental_option("prefs", noImageConfig)
-            edgeOptions.add_argument('--no-proxy-server') # disable proxy
+        edgeOptions.use_chromium = True # is this necessary?
+        edgeOptions.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2}) # hide images
+        edgeOptions.add_argument("--no-proxy-server") # disable proxy
+        edgeOptions.add_experimental_option("useAutomationExtension", False) # disable automation alert
+        edgeOptions.add_experimental_option("excludeSwitches", ["enable-logging", "enable-automation"]) #disable logging & alert
         
         url = input("Input a Microblog link: ")
         self.crawlMode = Utility.DetectCrawlMode(url)
@@ -64,7 +62,7 @@ class MicrobolgCrawler:
     def Login(self) -> None:
             cookieManager = CookieManager()
             cookies = cookieManager.ReadCookies()
-            if len(cookies) != 0:
+            if False and self.crawlMode == Constant.CrawlMode.singleItem and len(cookies) != 0:
                 for cookie in cookies:
                     self.browser.add_cookie(cookie)
                 self.browser.refresh()
@@ -148,6 +146,7 @@ class MicrobolgCrawler:
         Utility.PrintLog("Program finished. Hit Enter key to exit.", Constant.Color.blue)
         input()
         self.browser.close()
+        exit()
 
     def GetPageCount(self) -> int:
         try:
@@ -158,6 +157,7 @@ class MicrobolgCrawler:
             return 1
         
     def GetUserGenderByID(self, userID: str) -> str:
+        return "Unknown"
         if userID in GlobalVariables.id2GenderDict:
             return GlobalVariables.id2GenderDict[userID]
 
@@ -168,15 +168,19 @@ class MicrobolgCrawler:
             self.browser.switch_to.window(self.browser.window_handles[1])
             # it may take longer to call this api for the first time
             # then normally it would not take more than 300ms
-            userInfoXPath = "/html/body/div[1]"
+            userInfoXPath = "/html/body"
             self.WaitElementLoadFinish(By.XPATH, userInfoXPath, Constant.TimeSpan.timeout)
-            rawUserInfo = self.browser.find_elements(By.XPATH, userInfoXPath)[0].get_attribute("innerText")
-            userInfoJson = json.loads(rawUserInfo)
-            genderDesc = userInfoJson.get("data", {}).get("user", {}).get("gender", "Unknown")
-            if genderDesc == "m":
-                GlobalVariables.id2GenderDict[userID] = "Male"
-            elif genderDesc == "f":
-                GlobalVariables.id2GenderDict[userID] = "Female"
+            rawUserInfoEle = self.browser.find_elements(By.XPATH, userInfoXPath)
+            if len(rawUserInfoEle) > 0:
+                rawUserInfo = rawUserInfoEle[0].find_elements(By.XPATH, "./*[1]")[0].get_attribute("innerText")
+                userInfoJson = json.loads(rawUserInfo)
+                genderDesc = userInfoJson.get("data", {}).get("user", {}).get("gender", "Unknown")
+                if genderDesc == "m":
+                    GlobalVariables.id2GenderDict[userID] = "Male"
+                elif genderDesc == "f":
+                    GlobalVariables.id2GenderDict[userID] = "Female"
+            else:
+                GlobalVariables.id2GenderDict[userID] = "Unknown"
         except:
             Utility.PrintLog("Get user gender timed out! Skipping...", Constant.Color.yellow)
         finally:
@@ -393,7 +397,7 @@ class MicrobolgCrawler:
                     # end of frame
                     # -----------------------------------------------------------------------
                 else:
-                    contentType = "c-o"
+                    # main comment exsist definitely
                     rawLikeCount = rawContentEle.find_elements(By.CLASS_NAME, "item1in")[0].find_elements(
                             By.CLASS_NAME, "info")[0].find_elements(By.CLASS_NAME, "woo-like-count")
                     likeCount = rawLikeCount[0].get_attribute("innerText") if len(rawLikeCount) else '0'
@@ -403,7 +407,36 @@ class MicrobolgCrawler:
                         By.TAG_NAME, "span")[-1].get_attribute("innerHTML")
                     content = Utility.MakeContentReadable(rawContent)
 
+                    # attached reply may not exsit
+                    outsideFrameReplyEles = rawContentEle.find_elements(By.CLASS_NAME, "list2")[0].find_elements(
+                        By.CLASS_NAME, "item2")
+                    contentType = "c-o" if len(outsideFrameReplyEles) == 0 else "c"
+
                     excelSerializer.WriteLine([contentType, likeCount, userID, userName, userGender, postTime, ipAddress, content])
+
+                    # attached reply(replies) outside frame
+                    for ofIndex in range(len(outsideFrameReplyEles)):
+                        outsideFrameReplyEle = outsideFrameReplyEles[ofIndex]
+                        ofRawReplyElement = outsideFrameReplyEle.find_elements(By.CLASS_NAME, "con2")[0]
+                        rawOfUserID = ofRawReplyElement.find_elements(By.TAG_NAME, "a")[0].get_attribute("href")
+                        ofUserID = re.search('/u/(\d+)', rawOfUserID).group(1)
+                        ofMixedTimeIP = ofRawReplyElement.find_elements(By.CLASS_NAME, "info")[0].find_elements(
+                            By.TAG_NAME, "div")[0].get_attribute("innerText")
+                        ofSeperatedTimeIP = Utility.SeperateTimeAndIPAddress(ofMixedTimeIP)
+                        ofPostTime = ofSeperatedTimeIP[0]
+                        ofIPAddress = ofSeperatedTimeIP[1]
+
+                        ofContentType = "r"
+                        ofRawLikeCount = ofRawReplyElement.find_elements(By.CLASS_NAME, "info")[0].find_elements(
+                            By.CLASS_NAME, "woo-like-count")
+                        ofLikeCount = ofRawLikeCount[0].get_attribute("innerText") if len(ofRawLikeCount) else '0'
+                        ofUserName = ofRawReplyElement.find_elements(By.TAG_NAME, "a")[0].get_attribute("innerText")
+                        ofUserGender = self.GetUserGenderByID(ofUserID)
+                        ofRawContent = ofRawReplyElement.find_elements(By.CLASS_NAME, "text")[0].find_elements(
+                            By.TAG_NAME, "span")[-1].get_attribute("innerHTML")
+                        ofContent = Utility.MakeContentReadable(ofRawContent)
+
+                        excelSerializer.WriteLine([ofContentType, ofLikeCount, ofUserID, ofUserName, ofUserGender, ofPostTime, ofIPAddress, ofContent])
 
             yAxis = self.browser.find_elements(By.TAG_NAME, "html")[0].get_attribute("scrollTop")
             self.browser.execute_script("window.scrollBy(0, 250);")

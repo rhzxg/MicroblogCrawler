@@ -131,18 +131,18 @@ dmypy.json
 .pyre/
 
 # crawled files
-/crawled
+Python/crawled
 
 # web driver
-/driver
+Python/driver
 
 # cookies
 *.cookies
 
 # test
-/test
+Python/test
 
 # pyinstaller
-/build/build
-/build/dist
-/build/*.spec
+Python/build/build
+Python/build/dist
+Python/build/*.spec
