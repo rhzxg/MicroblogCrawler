@@ -38,7 +38,6 @@ class MicrobolgCrawler:
         self.browser = webdriver.Edge(webDriverPath, options=edgeOptions)
 
     def StartSession(self) -> None:
-        self.browser.delete_all_cookies()
         self.browser.get("https://weibo.com/login.php")
         childFolder = Utility.UnquoteDirectoryFromUrl(self.urlToBeCrawled, self.crawlMode)
         self.currFolderPath = os.path.join(self.parentFolder, childFolder)
@@ -61,8 +60,9 @@ class MicrobolgCrawler:
 
     def Login(self) -> None:
             cookieManager = CookieManager()
-            cookies = cookieManager.ReadCookies()
-            if False and self.crawlMode == Constant.CrawlMode.singleItem and len(cookies) != 0:
+            cookies = cookieManager.ReadCookies(self.crawlMode)
+            if False and len(cookies) != 0:
+                self.browser.delete_all_cookies()
                 for cookie in cookies:
                     self.browser.add_cookie(cookie)
                 self.browser.refresh()
@@ -70,14 +70,7 @@ class MicrobolgCrawler:
             else:
                 qrCodeImage = None
                 try:
-                    loginBtnPath = r"/html/body/div[1]/div[1]/div/div[1]/div/div/div[3]/div[2]/ul/li[3]/a"
-                    self.WaitElementLoadFinish(By.XPATH, loginBtnPath)
-                    self.browser.find_element(By.XPATH, loginBtnPath).click()
-
-                    self.WaitElementLoadFinish(By.CLASS_NAME, "tab_bar")
-                    self.browser.find_elements(By.CLASS_NAME, "tab_bar")[0].find_elements(By.TAG_NAME, "a")[1].click()
-                    
-                    qrCodeEleXpath = "/html/body/div[4]/div[2]/div[3]/div[2]/div[1]/img"
+                    qrCodeEleXpath = "/html/body/div/div/div/div[2]/div[1]/div[2]/div/img"
                     self.WaitElementLoadFinish(By.XPATH, qrCodeEleXpath)
                     qrCodeEle = self.browser.find_element(By.XPATH, qrCodeEleXpath)
                     qrCodeUrl = qrCodeEle.get_attribute("src")
@@ -91,9 +84,9 @@ class MicrobolgCrawler:
 
                 self.WaitElementLoadFinish(By.CLASS_NAME, "woo-badge-box")
                 Utility.PrintLog("Login succeeded! Redirecting...", Constant.Color.green)
-                qrCodeImage.close()
+                # qrCodeImage.close()
 
-                cookieManager.SaveCookies(self.browser.get_cookies())
+                # cookieManager.SaveCookies(self.browser.get_cookies())
 
     def Crawl(self) -> None:
         if self.crawlMode == Constant.CrawlMode.singleItem:
@@ -167,7 +160,7 @@ class MicrobolgCrawler:
             self.browser.execute_script("window.open('" + api + "', '_blank');")
             self.browser.switch_to.window(self.browser.window_handles[1])
             # it may take longer to call this api for the first time
-            # then normally it would not take more than 300ms
+            # then normally it would not take more than 300ms per identical user
             userInfoXPath = "/html/body"
             self.WaitElementLoadFinish(By.XPATH, userInfoXPath, Constant.TimeSpan.timeout)
             rawUserInfoEle = self.browser.find_elements(By.XPATH, userInfoXPath)
