@@ -68,19 +68,53 @@ class MicrobolgCrawler:
                 self.browser.refresh()
                 Utility.PrintLog("Login succeeded by using cookies! Redirecting...", Constant.Color.green)
             else:
-                qrCodeImage = None
-                try:
-                    qrCodeEleXpath = "/html/body/div/div/div/div[2]/div[1]/div[2]/div/img"
-                    self.WaitElementLoadFinish(By.XPATH, qrCodeEleXpath)
-                    qrCodeEle = self.browser.find_element(By.XPATH, qrCodeEleXpath)
-                    qrCodeUrl = qrCodeEle.get_attribute("src")
-                    response = urllib.request.urlopen(qrCodeUrl)
-                    qrCodeImage = PIL.Image.open(io.BytesIO(response.read()))
-                    qrCodeImage.show()
-                except:
-                    errMsg = "Error occurred while getting the QR code. Please restart the program!"
-                    Utility.PrintLog(errMsg, Constant.Color.red)
+                mainHandle = self.browser.current_window_handle
+                
+                loginBtnPath = r"/html/body/div/div[2]/div[1]/div[1]/div[2]/div/button"
+                self.WaitElementLoadFinish(By.XPATH, loginBtnPath)
+                self.browser.find_element(By.XPATH, loginBtnPath).click()
+                
+                handles = self.browser.window_handles
+                if len(handles) <= 1:
+                    log = "Could not find the login window!"
+                    Utility.PrintLog(log, Constant.Color.red)
                     Utility.ExitProgram()
+                else:
+                    log = "Found {} popup window handle(s).".format(len(handles) - 1)
+                    Utility.PrintLog(log, Constant.Color.green)
+
+                for index in range(len(handles)):
+                    handle = handles[index]
+                    if handle == mainHandle:
+                        continue
+
+                    self.browser.switch_to.window(handle)
+                    if not self.browser.current_url.startswith("https://passport.weibo.com/sso/"):
+                        Utility.PrintLog("Skipping the unexpected popup window...", Constant.Color.green)
+                        continue
+                    else:
+                        Utility.PrintLog("Switching to pupup window No. {}!".format(index), Constant.Color.green)
+
+                    qrCodeImage = None
+                    try:
+                        qrCodeEleXpath = "/html/body/div/div/div/div[2]/div[1]/div[2]/div/img"
+                        self.WaitElementLoadFinish(By.XPATH, qrCodeEleXpath, 10, "Timed out while getting QR code!")
+                        qrCodeEle = self.browser.find_element(By.XPATH, qrCodeEleXpath)
+                        qrCodeUrl = qrCodeEle.get_attribute("src")
+                        response = urllib.request.urlopen(qrCodeUrl)
+                        qrCodeImage = PIL.Image.open(io.BytesIO(response.read()))
+                        qrCodeImage.show()
+                        break
+                    except:
+                        if index == len(handles) - 1:
+                            errMsg = "Error occurred while getting QR code. Please restart the program!"
+                            Utility.PrintLog(errMsg, Constant.Color.red)
+                            Utility.ExitProgram()
+                        else:
+                            continue
+
+                Utility.PrintLog("Switching back...", Constant.Color.green)
+                self.browser.switch_to.window(mainHandle)
 
                 self.WaitElementLoadFinish(By.CLASS_NAME, "woo-badge-box")
                 Utility.PrintLog("Login succeeded! Redirecting...", Constant.Color.green)
