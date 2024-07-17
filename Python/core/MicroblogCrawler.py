@@ -93,7 +93,7 @@ class MicrobolgCrawler:
                         Utility.PrintLog("Skipping the unexpected popup window...", Constant.Color.green)
                         continue
                     else:
-                        Utility.PrintLog("Switching to pupup window No. {}!".format(index), Constant.Color.green)
+                        Utility.PrintLog("Switching to pupup window No. {}...".format(index), Constant.Color.green)
 
                     qrCodeImage = None
                     try:
