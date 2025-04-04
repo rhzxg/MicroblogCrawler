@@ -277,6 +277,12 @@ class MicrobolgCrawler:
         Utility.PrintLog("Crawling on detailed page. Redirecting...")
         self.browser.get(url)
 
+        Utility.PrintLog("Waiting for login state changes (up to 20 seconds)...", Constant.Color.green)
+        self.WaitElementLoadFinish(By.XPATH, "/html/body/div/div[4]/div[1]/div/div[2]/button[2]", 20)
+
+        Utility.PrintLog("Login state change detected, refreshing...", Constant.Color.green)
+        self.browser.refresh()
+
         excelSerializer = ExcelSerializer()
 
         mainContent = self.browser.find_elements(By.CLASS_NAME, "detail_wbtext_4CRf9")[0].get_attribute("innerText")
