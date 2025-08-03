@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.core.driver_cache import DriverCacheManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from core.Utility import *
 from core.ExcelSerializer import *
@@ -34,7 +35,10 @@ class MicrobolgCrawler:
         self.crawlMode = Utility.DetectCrawlMode(url)
         self.urlToBeCrawled = Utility.TrimUrl(url, self.crawlMode)
 
-        webDriverPath = EdgeChromiumDriverManager(path="driver/").install()
+        cacheManager = DriverCacheManager(root_dir="driver/")
+        webDriverPath = EdgeChromiumDriverManager(url="https://msedgedriver.microsoft.com/",
+                                                  latest_release_url="https://msedgedriver.microsoft.com/LATEST_RELEASE",
+                                                  cache_manager=cacheManager).install()
         self.browser = webdriver.Edge(webDriverPath, options=edgeOptions)
 
     def StartSession(self) -> None:
