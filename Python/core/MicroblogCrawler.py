@@ -174,9 +174,12 @@ class MicrobolgCrawler:
                     nextPageBtn.click()
                     Utility.SleepFor(Constant.TimeSpan.long)
 
-        Utility.PrintLog("Program finished. Hit Enter key to exit.", Constant.Color.blue)
-        input()
-        self.browser.close()
+        Utility.PrintLog("Program finished. Press Enter key to exit.", Constant.Color.blue)
+        try:
+            input()
+            self.browser.close()
+        except:
+            pass
         exit()
 
     def GetPageCount(self) -> int:

@@ -145,5 +145,8 @@ class Utility:
         return [mixedStr, "Unknown"]
     
     def ExitProgram() -> None:
-        input()
+        try:
+            input()
+        except:
+            pass
         exit()
